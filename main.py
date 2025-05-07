@@ -1,7 +1,6 @@
 import os
 import json
 import asyncio
-
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -17,13 +16,12 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from google_search_agent.agent import root_agent
 
-#
 # ADK Streaming
-#
 
 # Load Gemini API Key
 load_dotenv()
@@ -105,11 +103,29 @@ async def client_to_agent_messaging(websocket, live_request_queue):
         await asyncio.sleep(0)
 
 
-#
 # FastAPI web app
-#
 
-app = FastAPI()
+
+app = FastAPI(
+    title="XponentialAI Assistant Bot",
+    description="API service for an Assistant Chatbot",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins (only for local testing!)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve static files (including the favicon)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Serve favicon directly at /favicon.ico
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    return FileResponse("static/favicon.ico")
 
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -119,6 +135,17 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 async def root():
     """Serves the index.html"""
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+@app.get("/", response_class=JSONResponse)
+async def index_page():
+    return JSONResponse(
+        content={
+            "status": "success",
+            "service": "Assistant Bot",
+            "powered_by": "XponentialAI"
+        },
+        status_code=200
+    )
 
 
 @app.websocket("/ws/{session_id}")
@@ -144,3 +171,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
 
     # Disconnected
     print(f"Client #{session_id} disconnected")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -29,11 +29,19 @@ name = "app"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "google-adk" },
+    { name = "python-dotenv" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "google-adk", specifier = ">=0.4.0" }]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.12" },
+    { name = "google-adk", specifier = ">=0.4.0" },
+    { name = "python-dotenv", specifier = ">=1.1.0" },
+    { name = "uvicorn", specifier = ">=0.34.2" },
+]
 
 [[package]]
 name = "authlib"
