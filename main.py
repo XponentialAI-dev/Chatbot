@@ -55,6 +55,7 @@ async def add_security_headers(request: Request, call_next):
         response.headers.update({
             "Content-Security-Policy": (
                 "default-src 'self'; "
+                "connect-src 'self' wss:; "  # Allow WebSocket connections
                 "style-src 'self' 'unsafe-inline'; "  # Allow inline styles
                 "script-src 'self' 'unsafe-inline'"   # Allow inline scripts
             ),

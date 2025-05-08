@@ -9,6 +9,10 @@ services:
         value: "FALSE"
       - key: GOOGLE_API_KEY
         fromGroup: gemini-keys
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 10000
     autoDeploy: true
     scaling:
       minInstances: 1
