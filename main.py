@@ -52,8 +52,14 @@ app = FastAPI(
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     if IS_PRODUCTION:
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        response.headers.update({
+            "Content-Security-Policy": (
+                "default-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "  # Allow inline styles
+                "script-src 'self' 'unsafe-inline'"   # Allow inline scripts
+            ),
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+        })
     return response
 
 def start_agent_session(session_id: str):
