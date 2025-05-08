@@ -140,18 +140,6 @@ async def root():
     """Serves the index.html"""
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
-@app.get("/", response_class=JSONResponse)
-async def index_page():
-    return JSONResponse(
-        content={
-            "status": "success",
-            "service": "Assistant Bot",
-            "powered_by": "XponentialAI"
-        },
-        status_code=200
-    )
-
-
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     """Client websocket endpoint"""
