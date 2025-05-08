@@ -4,57 +4,75 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 
-from google.genai.types import (
-    Part,
-    Content,
-)
-
+from google.genai.types import Part, Content
 from google.adk.runners import Runner
 from google.adk.agents import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
+from starlette.middleware import Middleware
 
 from google_search_agent.agent import root_agent
 
-# ADK Streaming
-
-# Load Gemini API Key
+# Load environment variables
 load_dotenv()
 
+# Configuration
 APP_NAME = "XponentialAI Bot"
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 session_service = InMemorySessionService()
 
+# Middleware configuration
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if not IS_PRODUCTION else [
+            "https://chatbot-727q.onrender.com",
+            "https://your-production-domain.com"
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
+
+app = FastAPI(
+    title="XponentialAI Assistant Bot",
+    description="API service for an Assistant Chatbot",
+    middleware=middleware
+)
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    if IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+    return response
 
 def start_agent_session(session_id: str):
     """Starts an agent session"""
-
-    # Create a Session
     session = session_service.create_session(
         app_name=APP_NAME,
         user_id=session_id,
         session_id=session_id,
     )
 
-    # Create a Runner
     runner = Runner(
         app_name=APP_NAME,
         agent=root_agent,
         session_service=session_service,
     )
 
-    # Set response modality = TEXT
     run_config = RunConfig(response_modalities=["TEXT"])
-
-    # Create a LiveRequestQueue for this session
     live_request_queue = LiveRequestQueue()
 
-    # Start agent session
     live_events = runner.run_live(
         session=session,
         live_request_queue=live_request_queue,
@@ -62,13 +80,11 @@ def start_agent_session(session_id: str):
     )
     return live_events, live_request_queue
 
-
-async def agent_to_client_messaging(websocket, live_events):
+async def agent_to_client_messaging(websocket: WebSocket, live_events):
     """Agent to client communication"""
     try:
         while True:
             async for event in live_events:
-                # turn_complete
                 if event.turn_complete:
                     await websocket.send_text(json.dumps({"turn_complete": True}))
                     print("[TURN COMPLETE]")
@@ -93,8 +109,7 @@ async def agent_to_client_messaging(websocket, live_events):
     except WebSocketDisconnect:
         print("WebSocket disconnected (agent_to_client_messaging)")
 
-
-async def client_to_agent_messaging(websocket, live_request_queue):
+async def client_to_agent_messaging(websocket: WebSocket, live_request_queue: LiveRequestQueue):
     """Client to agent communication"""
     try:
         while True:
@@ -106,65 +121,53 @@ async def client_to_agent_messaging(websocket, live_request_queue):
     except WebSocketDisconnect:
         print("WebSocket disconnected (client_to_agent_messaging)")
 
-
-# FastAPI web app
-
-
-app = FastAPI(
-    title="XponentialAI Assistant Bot",
-    description="API service for an Assistant Chatbot",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (only for local testing!)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Serve static files (including the favicon)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Serve favicon directly at /favicon.ico
-@app.get("/favicon.ico", include_in_schema=False)
-async def get_favicon():
-    return FileResponse("static/favicon.ico")
-
+# Static files setup
 STATIC_DIR = Path("static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    return FileResponse(STATIC_DIR / "favicon.ico")
 
 @app.get("/")
 async def root():
     """Serves the index.html"""
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return FileResponse(STATIC_DIR / "index.html")
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
-    """Client websocket endpoint"""
+    """Secure WebSocket endpoint"""
+    # Enforce WSS in production
+    if IS_PRODUCTION and websocket.url.scheme != "wss":
+        await websocket.close(code=1003)  # 1003 = Forbidden
+        return
 
-    # Wait for client connection
     await websocket.accept()
     print(f"Client #{session_id} connected")
 
-    # Start agent session
     session_id = str(session_id)
     live_events, live_request_queue = start_agent_session(session_id)
 
-    # Start tasks
-    agent_to_client_task = asyncio.create_task(
-        agent_to_client_messaging(websocket, live_events)
-    )
-    client_to_agent_task = asyncio.create_task(
-        client_to_agent_messaging(websocket, live_request_queue)
-    )
-    await asyncio.gather(agent_to_client_task, client_to_agent_task)
-
-    # Disconnected
-    print(f"Client #{session_id} disconnected")
-
+    try:
+        agent_task = asyncio.create_task(
+            agent_to_client_messaging(websocket, live_events)
+        )
+        client_task = asyncio.create_task(
+            client_to_agent_messaging(websocket, live_request_queue)
+        )
+        await asyncio.gather(agent_task, client_task)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        print(f"Client #{session_id} disconnected")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        ssl_certfile=os.getenv("SSL_CERTFILE"),
+        ssl_keyfile=os.getenv("SSL_KEYFILE"),
+        reload=not IS_PRODUCTION
+    )
