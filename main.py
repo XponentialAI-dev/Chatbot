@@ -168,19 +168,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
     finally:
         print(f"Client #{session_id} disconnected")
 
-
-@app.get("/pinecone-status")
-async def pinecone_status():
-    try:
-        stats = pinecone_retriever.vectorstore.index.describe_index_stats()
-        return {
-            "status": "connected",
-            "index_stats": stats,
-            "index_name": pinecone_retriever.index_name
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
