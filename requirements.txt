@@ -2,3 +2,10 @@ fastapi
 uvicorn
 google-adk
 python-dotenv
+
+pypdf
+langchain
+pinecone-client
+langchain-pinecone
+langchain-community 
+sentence-transformers

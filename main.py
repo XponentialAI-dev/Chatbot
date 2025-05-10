@@ -4,8 +4,8 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 
-from google.genai.types import Part, Content
 from google.adk.runners import Runner
+from google.genai.types import Part, Content
 from google.adk.agents import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
 from starlette.middleware import Middleware
 
-from google_search_agent.agent import root_agent
+from rag.agent import root_agent
 
 # Load environment variables
 load_dotenv()
@@ -32,8 +32,8 @@ middleware = [
     Middleware(
         CORSMiddleware,
         allow_origins=["*"] if not IS_PRODUCTION else [
-            "https://chatbot-727q.onrender.com",
-            "https://your-production-domain.com"
+            "http://localhost:8000/",
+            "https://chatbot-727q.onrender.com"
         ],
         allow_credentials=True,
         allow_methods=["*"],
@@ -167,6 +167,19 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
         print(f"WebSocket error: {e}")
     finally:
         print(f"Client #{session_id} disconnected")
+
+
+@app.get("/pinecone-status")
+async def pinecone_status():
+    try:
+        stats = pinecone_retriever.vectorstore.index.describe_index_stats()
+        return {
+            "status": "connected",
+            "index_stats": stats,
+            "index_name": pinecone_retriever.index_name
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
