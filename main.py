@@ -174,7 +174,5 @@ if __name__ == "__main__":
         app,
         host="0.0.0.0",
         port=int(os.getenv("PORT", "8000")),
-        ssl_certfile=os.getenv("SSL_CERTFILE"),
-        ssl_keyfile=os.getenv("SSL_KEYFILE"),
         reload=not IS_PRODUCTION
     )
