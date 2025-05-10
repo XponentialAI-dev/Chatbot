@@ -9,8 +9,12 @@ services:
         value: "FALSE"
       - key: GOOGLE_API_KEY
         fromGroup: gemini-keys
+      - key: PINECONE_API_KEY
+        fromGroup: gemini-keys
       - key: ENVIRONMENT
         value: production
+      - key: PINECONE_ENVIRONMENT
+        value: gcp-starter
       - key: PORT
         value: 10000
     autoDeploy: true
