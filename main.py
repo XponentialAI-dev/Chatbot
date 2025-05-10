@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
 from starlette.middleware import Middleware
 
-from rag.agent import root_agent
+from coordinator.agent import coordinator
 
 # Load environment variables
 load_dotenv()
@@ -73,7 +73,7 @@ def start_agent_session(session_id: str):
 
     runner = Runner(
         app_name=APP_NAME,
-        agent=root_agent,
+        agent=coordinator,
         session_service=session_service,
     )
 

@@ -3,7 +3,7 @@ import json
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from langchain_pinecone import PineconeVectorStore
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from typing import List, Dict, Any
 from pydantic import BaseModel
 
@@ -67,9 +67,10 @@ def pinecone_retrieval_tool(query: str) -> str:
         "results": results
     })
 
-root_agent = Agent(
+rag_agent = Agent(
     model='gemini-2.0-flash-exp',
     name='ask_rag_agent',
+
     instruction="""Always use the retrieval tool to find relevant information before answering. 
     Follow these steps:
     1. First search for relevant documents using the retrieval tool
@@ -77,5 +78,6 @@ root_agent = Agent(
     3. Provide a comprehensive answer based on the documents
     4. If no documents are found, say "I couldn't find information about [query] in my knowledge base"
     """,
+    
     tools=[pinecone_retrieval_tool]
 )
